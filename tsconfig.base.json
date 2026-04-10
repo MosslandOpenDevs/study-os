@@ -9,7 +9,8 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@study-os/core": ["packages/core/src/index.ts"]
+      "@study-os/core": ["packages/core/src/index.ts"],
+      "@study-os/ingestion": ["packages/ingestion/src/index.ts"]
     }
   }
 }

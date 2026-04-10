@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GoalType {
+  exam
+  course
+  custom
+}
+
+enum GoalStatus {
+  active
+  completed
+  paused
+}
+
+enum StudySourceType {
+  pdf
+  markdown
+  text
+}
+
+enum QuizType {
+  multiple_choice
+  short_answer
+  fill_in_the_blank
+}
+
+enum ErrorType {
+  concept_gap
+  careless_mistake
+  misread_question
+  time_pressure
+}
+
+enum ReviewStatus {
+  pending
+  done
+  skipped
+}
+
+model User {
+  id           String            @id @default(cuid())
+  displayName  String
+  locale       String            @default("ko-KR")
+  timezone     String            @default("Asia/Seoul")
+  createdAt    DateTime          @default(now())
+  studyGoals   StudyGoal[]
+  studySources StudySource[]
+  attempts     Attempt[]
+  notebook     ErrorNotebookEntry[]
+  reviewTasks  ReviewTask[]
+}
+
+model StudyGoal {
+  id         String     @id @default(cuid())
+  userId     String
+  title      String
+  targetDate DateTime?
+  goalType   GoalType
+  status     GoalStatus @default(active)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudySource {
+  id               String          @id @default(cuid())
+  userId           String
+  title            String
+  sourceType       StudySourceType
+  originalFilename String?
+  storageUrl       String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyUnits       StudyUnit[]
+}
+
+model StudyUnit {
+  id            String      @id @default(cuid())
+  sourceId      String
+  title         String
+  content       String
+  orderIndex    Int
+  citationStart Int?
+  citationEnd   Int?
+  createdAt     DateTime    @default(now())
+  source        StudySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  summaryCard   SummaryCard?
+  quizSets      QuizSet[]
+}
+
+model SummaryCard {
+  id              String    @id @default(cuid())
+  studyUnitId      String    @unique
+  shortSummary     String
+  keyConcepts      String[]
+  confusionPoints  String[]
+  tonePreset       String
+  createdAt        DateTime  @default(now())
+  studyUnit        StudyUnit @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
+}
+
+model QuizSet {
+  id         String    @id @default(cuid())
+  studyUnitId String
+  title      String
+  quizType   QuizType
+  createdAt  DateTime  @default(now())
+  studyUnit  StudyUnit @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
+  quizItems  QuizItem[]
+}
+
+model QuizItem {
+  id          String    @id @default(cuid())
+  quizSetId   String
+  prompt      String
+  answer      String
+  explanation String?
+  difficulty  Int?
+  createdAt   DateTime  @default(now())
+  quizSet     QuizSet   @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
+  attempts    Attempt[]
+  notebookEntries ErrorNotebookEntry[]
+}
+
+model Attempt {
+  id              String    @id @default(cuid())
+  userId          String
+  quizItemId      String
+  submittedAnswer String
+  isCorrect       Boolean
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizItem        QuizItem  @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+  notebookEntry   ErrorNotebookEntry?
+}
+
+model ErrorNotebookEntry {
+  id           String       @id @default(cuid())
+  userId       String
+  quizItemId   String
+  attemptId    String       @unique
+  errorType    ErrorType
+  note         String?
+  nextReviewAt DateTime?
+  reviewCount  Int          @default(0)
+  createdAt    DateTime     @default(now())
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizItem     QuizItem     @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+  attempt      Attempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  reviewTasks  ReviewTask[]
+}
+
+model ReviewTask {
+  id              String             @id @default(cuid())
+  userId          String
+  notebookEntryId String
+  scheduledAt     DateTime
+  status          ReviewStatus       @default(pending)
+  createdAt       DateTime           @default(now())
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notebookEntry   ErrorNotebookEntry @relation(fields: [notebookEntryId], references: [id], onDelete: Cascade)
+}
