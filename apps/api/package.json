@@ -1,0 +1,19 @@
+{
+  "name": "@study-os/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "echo api lint placeholder",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@study-os/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
