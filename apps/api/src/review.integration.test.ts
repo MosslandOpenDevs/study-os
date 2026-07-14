@@ -105,7 +105,9 @@ describe.skipIf(!hasDatabase)("review API (integration)", () => {
     expect(event.rating).toBe("good");
     expect(event.latencyMs).toBe(4200);
     expect(event.algorithm).toBe(body.algorithm);
-    expect(event.schedulerStateBefore).toBeNull(); // first review of this card
+    // First review: before-state is the explicit initial (never-reviewed)
+    // card, so recomputation can always start from a concrete snapshot.
+    expect(event.schedulerStateBefore).toMatchObject({ reps: 0 });
     expect(event.schedulerStateAfter).toMatchObject({ reps: 1 });
     expect(event.scheduledAt?.toISOString()).toBe(body.nextDue);
   });
@@ -133,7 +135,9 @@ describe.skipIf(!hasDatabase)("review API (integration)", () => {
     expect(events).toHaveLength(2);
     // Raw-event chain: second event's before-state equals first's after-state.
     expect(events[1]?.schedulerStateBefore).toEqual(events[0]?.schedulerStateAfter);
-    expect(events[1]?.schedulerStateAfter).toMatchObject({ reps: 2, lapses: 1 });
+    // Note: FSRS-6 does not count a lapse for an "again" on a card still in
+    // the learning phase — assert the rep count, not lapses.
+    expect(events[1]?.schedulerStateAfter).toMatchObject({ reps: 2 });
   });
 
   it("404s for an unknown episode and 400s for a bad rating", async () => {
