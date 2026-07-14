@@ -73,9 +73,10 @@ remediation with recurrence measurement**, on a single exam vertical.
 
 ### Target loop
 
-Instead of merely *saving* a wrong answer (today's `ErrorNotebookEntry`), the
-intended flow attributes each error to a cause, prescribes an intervention, and
-verifies whether the same concept fails again:
+Instead of merely *saving* a wrong answer (the old `ErrorNotebookEntry`, now
+removed), each error is attributed to a cause, prescribed an intervention, and
+tracked for recurrence. The full loop is **modeled in the database** (see
+`prisma/schema.prisma`); the application wiring lands with M2:
 
 ```text
 SourceSpan
@@ -121,7 +122,8 @@ pending user validation and item-usage rights.
 | Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
-| Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (`prisma-client` generator, PostgreSQL driver adapter), first migration, idempotent seed, `.env.example`, docker-compose Postgres; CI applies the migration and smoke-tests the built client against a real database |
+| Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (PostgreSQL driver adapter), migrations + seed, docker-compose; CI applies migrations and smoke-tests against real Postgres |
+| Remediation data model (issue #2) | ✅ Implemented | `SourceRevision`/`SourceSpan` evidence backbone, `GenerationRun` provenance, `QuizItem` with choices/rubric/citations, `Attempt` (latency/confidence), `ErrorEpisode` (suggested vs confirmed cause), `Intervention`, `TransferAttempt`, append-only `ReviewEvent`; integration-tested end to end in CI. Application wiring is M2. |
 | Summary generation (`@study-os/summary`) | ✅ Implemented | Korean-first `SummaryProvider` contract with provenance (`GenerationRun` info: model, prompt version, input hash, tokens); Claude-backed provider (structured outputs, adaptive thinking) when `ANTHROPIC_API_KEY` is set, deterministic offline mock otherwise; **fail-closed** on missing/insufficient evidence, refusals, and malformed output; demo route `POST /api/demo/summary` |
 | PDF / storage | ❌ Missing | No PDF parser or object storage (M3) |
 | Tests / lint / CI | ✅ Implemented | Biome lint, Vitest unit tests, GitHub Actions with a frozen-lockfile install and a runtime smoke test of the built API |
@@ -205,12 +207,14 @@ notes, not a live backlog.
 | **M3 — Secure PDF / LLM** | Sandboxed parser, verifiable citations, privacy controls, and an evaluation harness |
 
 Before broadening to PDFs, the goal is to complete a **text-only** slice end to
-end. The near-term data model the slice needs (beyond today's types) includes
-`SourceRevision` / `SourceSpan`, a `GenerationRun` (model, prompt, parser version,
-input hash, cost), a richer `QuizItem` (choices, accepted answers, rubric,
-citations), `Attempt` (latency, confidence, grading method), `ErrorEpisode`
-(suggested vs. confirmed cause), `Intervention` / `TransferAttempt`, and
-`ReviewEvent` (rating, pre/post FSRS state, algorithm version).
+end. The remediation data model is **implemented**: `SourceRevision` (verbatim
+source text — citations resolve forever) / `SourceSpan`, `GenerationRun`
+(provider, model, prompt version, input hash, tokens, cost), a richer
+`QuizItem` (choices, accepted answers, rubric, span citations), `Attempt`
+(latency, confidence, grading method), `ErrorEpisode` (suggested vs.
+learner-confirmed cause, status lifecycle), `Intervention`, `TransferAttempt`
+(recurrence measurement), and the append-only `ReviewEvent` log (rating,
+latency, algorithm version, opaque pre/post scheduler state — recomputable).
 
 FSRS should be introduced **behind an adapter**, preserving `Again / Hard / Good /
 Easy`, latency, and algorithm version as raw events so schedules can be

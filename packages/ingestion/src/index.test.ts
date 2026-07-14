@@ -156,6 +156,7 @@ describe("buildIngestionResult — validation", () => {
       sourceType: "markdown",
       originalFilename: "notes.md",
     });
+    expect(result.rawText).toBe("스택은 LIFO이다.");
     expect(result.units).toHaveLength(1);
   });
 

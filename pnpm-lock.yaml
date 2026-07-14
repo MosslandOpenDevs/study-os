@@ -125,6 +125,9 @@ importers:
         specifier: workspace:*
         version: link:../ingestion
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
