@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/ingestion" },
+    { "path": "packages/quiz-engine" },
+    { "path": "packages/scheduler" },
+    { "path": "apps/api" }
+  ]
+}

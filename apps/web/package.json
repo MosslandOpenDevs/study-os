@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "echo web lint placeholder",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@study-os/core": "workspace:*",
@@ -18,7 +17,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "^5.8.3",
+    "typescript": "catalog:",
     "vite": "^7.0.0"
   }
 }

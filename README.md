@@ -8,9 +8,9 @@ what runs today (see [Implementation status](#implementation-status)).
 > **Status: Experimental / Pre-alpha.**
 >
 > This repository currently contains an **architectural scaffold** — planning
-> docs, shared TypeScript types, and stub algorithms. It is **not** a runnable
-> study service, and the API does not yet start (see
-> [Implementation status](#implementation-status)).
+> docs, shared TypeScript types, stub algorithms, and a minimal API that boots
+> but serves only health/demo endpoints. It is **not** a usable study service
+> (see [Implementation status](#implementation-status)).
 >
 > This is an *experimental reference implementation*, not a released product and
 > not (yet) open source: **no LICENSE has been chosen**, so treat the code as
@@ -31,13 +31,19 @@ archived rather than developed further.
   users, sources, study units, quizzes, attempts, an error notebook, and review
   tasks.
 - Three **stub algorithm packages** (ingestion, quiz-engine, scheduler) that
-  compile and typecheck but contain placeholder logic, no LLM calls, and no
+  build and pass tests but contain placeholder logic, no LLM calls, and no
   persistence.
+- A minimal **Fastify API** (`apps/api`) that boots, serves `/healthz`,
+  `/readyz`, and a demo route, and shuts down gracefully — no product
+  endpoints yet.
 - A static Vite + React **intro page** (`apps/web`).
+- **Quality gates:** Biome lint, Vitest unit tests, and a GitHub Actions
+  pipeline (frozen install → lint → typecheck → test → build → runtime smoke
+  test of the built API).
 - A set of **planning documents** in [`docs/`](docs/).
 
-**What is _not_ here yet:** a running HTTP API, a database client/migrations,
-any real LLM or PDF processing, storage, authentication, tests, lint, or CI.
+**What is _not_ here yet:** product API endpoints, a database
+client/migrations, any real LLM or PDF processing, storage, or authentication.
 
 ---
 
@@ -106,16 +112,17 @@ pending user validation and item-usage rights.
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
 | Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
-| API (`apps/api`) | ❌ Not runnable | `server.ts` is a `console.log` sample, not an HTTP server, and imports packages it does not declare as dependencies (`ERR_MODULE_NOT_FOUND` at runtime) |
+| API (`apps/api`) | 🟡 Minimal but runnable | Fastify server with `/healthz`, `/readyz`, graceful shutdown, and a demo route proving runtime package resolution; no product endpoints |
 | Database (`prisma/schema.prisma`) | 🟡 Schema only | Schema present (`prisma-client-js`); no client generation, migrations, seed, or Postgres wiring |
-| UI package (`packages/ui`) | ⬜ Empty | Only a `.gitkeep`; no `package.json` |
 | LLM / PDF / storage | ❌ Missing | No model calls, PDF parser, or object storage |
-| Tests / lint / CI | ❌ Missing | No test scripts; every `lint` is `echo … placeholder`; no GitHub Actions |
+| Tests / lint / CI | ✅ Implemented | Biome lint, Vitest unit tests, GitHub Actions with a frozen-lockfile install and a runtime smoke test of the built API |
 
-> Note on the build: `pnpm typecheck` and `pnpm build` pass, but the built API
-> still fails to run. `tsconfig` path aliases resolve the workspace imports at
-> compile time, which masks the missing runtime dependency declarations in
-> `apps/api/package.json`. **Compiling is not the same as being deployable.**
+> Note on the build: the original scaffold compiled while the built API crashed
+> at runtime (`ERR_MODULE_NOT_FOUND`), because `tsconfig` path aliases masked
+> undeclared dependencies. That trap is now closed: workspace packages are
+> declared dependencies resolved through built `dist` exports, and CI boots the
+> actual built artifact on every change. **Compiling is not the same as being
+> deployable — which is why the smoke test exists.**
 
 ---
 
@@ -124,42 +131,47 @@ pending user validation and item-usage rights.
 ```text
 apps/
   web/            # Vite + React intro page
-  api/            # console.log sample (not an HTTP server yet)
+  api/            # Fastify API: /healthz, /readyz, demo route, graceful shutdown
 packages/
   core/           # shared TypeScript domain types
   ingestion/      # text-split stub
   quiz-engine/    # placeholder quiz generation + exact-match grading
   scheduler/      # fixed-interval review stub
-  ui/             # empty placeholder (.gitkeep only)
 prisma/
   schema.prisma   # data model (no migrations yet)
+scripts/
+  smoke-api.mjs   # boots the built API artifact and verifies it end to end
 docs/             # planning notes: product brief, MVP, roadmap, personas,
                   # architecture, backlog
 ```
 
 There is **no `packages/prompts`** (it was listed in an earlier version of this
-README but never existed), and `packages/ui` is an empty placeholder rather than
-a real workspace package.
+README but never existed). The formerly empty `packages/ui` placeholder was
+removed; a UI package will be created when there is real shared UI code.
 
 ---
 
 ## Tech stack (as built)
 
-- **Package manager:** pnpm workspace (currently pinned `pnpm@10.11.0`).
+- **Runtime / tooling:** Node 24 (`.nvmrc`), pnpm 11 (pinned via
+  `packageManager`), committed lockfile, Biome for lint/format, Vitest for
+  tests.
 - **Web:** Vite 7 + React 19 (the earlier README proposed Next.js; the actual
   implementation is Vite, and this is the intended direction).
-- **Packages/API:** TypeScript, ESM, `tsx` for dev.
+- **Packages/API:** TypeScript project references building to `dist` (packages
+  are consumed through their built `exports`, not source aliases), ESM,
+  Fastify 5, `tsx` for dev.
 - **Database:** Prisma schema targeting PostgreSQL (schema only).
 
 ### Known baseline gaps
 
-- `pnpm-lock.yaml` is **git-ignored**, so `pnpm install --frozen-lockfile` fails
-  — the lockfile needs to be committed.
-- The API has no runnable artifact, health checks, or graceful shutdown.
-- Prisma has no client output, migrations, seed, or `.env.example`.
-- No real linter, no tests, no CI pipeline.
+- Prisma has no client output, migrations, seed, or `.env.example` — this is
+  the remaining M0 item (issue #14).
+- The API serves only health/demo endpoints; product endpoints arrive with the
+  M1 vertical slice.
 
-These are the first things the roadmap addresses (milestone **M0**).
+Earlier gaps — the git-ignored lockfile, the non-runnable API, and the missing
+linter/tests/CI — are fixed.
 
 ---
 
@@ -232,17 +244,21 @@ Explicitly out of scope for now, to keep the bet narrow:
 
 ## Local development
 
-Requires Node.js and pnpm.
+Requires Node 24+ (see `.nvmrc`) and pnpm 11 (pinned via `packageManager`; with
+Corepack, `corepack enable` picks it up automatically).
 
 ```bash
-pnpm install        # NOTE: --frozen-lockfile does not work yet (lockfile is gitignored)
-pnpm typecheck      # passes
-pnpm build          # passes
-pnpm dev            # runs the web intro page; the API entry only console.logs a sample
+pnpm install --frozen-lockfile   # reproducible install from the committed lockfile
+pnpm lint                        # Biome
+pnpm typecheck                   # tsc -b across all project references + web
+pnpm test                        # Vitest unit tests
+pnpm build                       # packages + API to dist/, web via Vite
+pnpm smoke                       # boots the built API and verifies health + shutdown
+pnpm dev                         # web intro page + API (tsx watch) in parallel
 ```
 
-Running the built API does **not** work yet — see the note under
-[Implementation status](#implementation-status). Making it run is milestone M0.
+The API listens on `PORT` (default `3000`, host `127.0.0.1`) and exposes
+`/healthz`, `/readyz`, and `/api/demo/study-loop`.
 
 ---
 

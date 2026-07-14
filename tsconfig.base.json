@@ -1,18 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "@study-os/core": ["packages/core/src/index.ts"],
-      "@study-os/ingestion": ["packages/ingestion/src/index.ts"],
-      "@study-os/quiz-engine": ["packages/quiz-engine/src/index.ts"],
-      "@study-os/scheduler": ["packages/scheduler/src/index.ts"]
-    }
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   }
 }

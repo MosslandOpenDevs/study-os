@@ -20,7 +20,10 @@ export function getNextReviewDate(entry: ErrorNotebookEntry, now = new Date()): 
   return new Date(now.getTime() + rule.delayHours * 60 * 60 * 1000);
 }
 
-export function buildReviewTask(entry: ErrorNotebookEntry, now = new Date()): Omit<ReviewTask, "id"> {
+export function buildReviewTask(
+  entry: ErrorNotebookEntry,
+  now = new Date(),
+): Omit<ReviewTask, "id"> {
   return {
     userId: entry.userId,
     notebookEntryId: entry.id,
