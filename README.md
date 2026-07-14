@@ -7,30 +7,35 @@ what runs today (see [Implementation status](#implementation-status)).
 
 > **Status: Experimental / Pre-alpha.**
 >
-> This repository currently contains an **architectural scaffold** — planning
-> docs, shared TypeScript types, stub algorithms, and a minimal API that boots
-> but serves only health/demo endpoints. It is **not** a usable study service
-> (see [Implementation status](#implementation-status)).
+> This repository contains a working **text-only vertical slice** — Korean
+> ingestion with resolvable citations, fail-closed summary generation, an
+> FSRS review scheduler, and upload/review APIs over PostgreSQL — but it is
+> **not** yet a usable study service: no auth, no quiz generation, no PDF
+> support, no deployment (see [Implementation status](#implementation-status)).
 >
 > This is an *experimental reference implementation*, not a released product.
 > The code is open source under **Apache-2.0** (see [LICENSE](LICENSE));
 > benchmark/corpus data is licensed separately (see
 > [docs/data-licensing.md](docs/data-licensing.md)).
 
-All code to date was authored on a single day (2026-04-10) as an initial
-scaffold. The repository is kept under a **conditional-maintenance gate** with
-30- and 60-day checkpoints measured from 2026-07-14 (see
-[Maintenance gate](#maintenance-gate)); if the gate is not met it will be
-archived rather than developed further.
+The original scaffold was authored on a single day (2026-04-10); the current
+implementation landed on 2026-07-14 across PRs #18–#26. The repository is kept
+under a **conditional-maintenance gate** with 30- and 60-day checkpoints
+measured from 2026-07-14 (see [Maintenance gate](#maintenance-gate)); if the
+gate is not met it will be archived rather than developed further.
 
 ---
 
 ## What's actually here today
 
 - A pnpm workspace monorepo (`apps/*`, `packages/*`).
-- Shared domain **types** in `@study-os/core` and a Prisma **schema** describing
-  users, sources, study units, quizzes, attempts, an error notebook, and review
-  tasks.
+- Shared domain **types** in `@study-os/core` and a Prisma **schema** covering
+  users, sources/revisions/spans, study units, quizzes with citations,
+  attempts, and the remediation loop (`ErrorEpisode`, `Intervention`,
+  `TransferAttempt`, `ReviewEvent`).
+- A **database layer** (`packages/db`): Prisma 7 with the PostgreSQL driver
+  adapter, migrations, and an idempotent seed — applied and smoke-tested
+  against real Postgres in CI.
 - A working **text ingestion pipeline** (`@study-os/ingestion`): deterministic,
   Korean-aware segmentation into study units whose citation offsets always
   resolve back to the exact source text, persisted atomically with real ids
@@ -43,9 +48,10 @@ archived rather than developed further.
 - One remaining **stub package** (quiz-engine): placeholder generation and
   exact-match grading, no LLM calls.
 - A **Fastify API** (`apps/api`) with health/readiness endpoints (readiness
-  verifies database connectivity), graceful shutdown, and the first product
-  endpoints: text source upload (`POST /api/sources` — validated, ingested,
-  persisted atomically) plus source/unit retrieval with citation offsets.
+  verifies database connectivity when a database is configured), graceful
+  shutdown, and the first product endpoints: text source upload
+  (`POST /api/sources` — validated, ingested, persisted atomically),
+  source/unit retrieval with citation offsets, and the review endpoints above.
 - A Vite + React **web app** (`apps/web`): study-unit list backed by the API
   (loading/error/empty states, citation badges) and a summary-card component,
   tested with Testing Library.
@@ -53,10 +59,6 @@ archived rather than developed further.
   pipeline (frozen install → lint → typecheck → test → build → runtime smoke
   test of the built API).
 - A set of **planning documents** in [`docs/`](docs/).
-
-- A **database layer** (`packages/db`): Prisma 7 with the PostgreSQL driver
-  adapter, a first migration, and an idempotent seed — applied and
-  smoke-tested against real Postgres in CI.
 
 **What is _not_ here yet:** authentication (userId travels in request bodies —
 must be replaced before any public exposure), PDF processing, object storage.
@@ -127,7 +129,7 @@ pending user validation and item-usage rights.
 | Domain types (`@study-os/core`) | ✅ Implemented | TypeScript interfaces + a product-vision string; no runtime logic |
 | Ingestion (`@study-os/ingestion`) | ✅ Implemented (text) | Deterministic Korean-aware segmentation (Markdown/`제N장`/numbered/가나다 headings + paragraphs) with citation offsets satisfying `rawText.slice(start, end) === content`; validation; persisted transactionally with real ids via `@study-os/db` (integration-tested against Postgres in CI). PDF ingestion is M3. |
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
-| Review scheduler (`@study-os/scheduler`) | ✅ Implemented | FSRS (ts-fsrs 5) behind an adapter — no hand-rolled algorithm; deterministic (fuzz off); JSON-serializable opaque card state; daily queue prioritizes recurring errors (failed transfers) over overdue time; validation + 14 unit tests; wired to `POST /api/review/events` (raw-event append) and `GET /api/review/queue` |
+| Review scheduler (`@study-os/scheduler`) | ✅ Implemented | FSRS (ts-fsrs 5) behind an adapter — no hand-rolled algorithm; deterministic (fuzz off); JSON-serializable opaque card state; daily queue prioritizes recurring errors (failed transfers) over overdue time; validation + 12 unit tests; wired to `POST /api/review/events` (raw-event append) and `GET /api/review/queue` |
 | Web app (`apps/web`) | 🟡 First screens | Study-unit list (`GET /api/sources` via dev proxy, loading/error/empty states, citation badges) + summary card rendering mock data with an AI-generated provenance label; Testing Library tests. Not yet a full study flow. |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (PostgreSQL driver adapter), migrations + seed, docker-compose; CI applies migrations and smoke-tests against real Postgres |
@@ -150,7 +152,7 @@ pending user validation and item-usage rights.
 ```text
 apps/
   web/            # Vite + React: study-unit list + summary card screens
-  api/            # Fastify API: /healthz, /readyz, demo route, graceful shutdown
+  api/            # Fastify API: sources upload/read, review events/queue, health
 packages/
   core/           # shared TypeScript domain types
   db/             # Prisma 7 client factory (PostgreSQL driver adapter)
@@ -161,7 +163,7 @@ packages/
 prisma/
   schema.prisma   # data model
   migrations/     # SQL migrations (applied in CI against real Postgres)
-  seed.ts         # idempotent dev seed
+  seed.mts        # idempotent dev seed
 prisma.config.ts  # Prisma 7 config: schema/migrations paths, seed, datasource
 scripts/
   smoke-api.mjs   # boots the built API artifact and verifies it end to end
@@ -190,14 +192,17 @@ removed; a UI package will be created when there is real shared UI code.
   PostgreSQL driver adapter, config in `prisma.config.ts`), migrations + seed,
   local Postgres via docker-compose.
 
-### Known baseline gaps
+### Known gaps
 
-- The API serves only health/demo endpoints; product endpoints arrive with the
-  M1 vertical slice.
+- **No authentication** — `userId` travels in request bodies; must be replaced
+  before any public exposure.
+- **Quiz generation is still a stub** — no model-backed, citation-carrying
+  question generation yet (the schema is ready for it).
+- **No PDF ingestion or object storage** (M3 by design).
 
 Earlier gaps — the git-ignored lockfile, the non-runnable API, the missing
-linter/tests/CI, and the schema-only database layer — are fixed. **M0 is
-complete.**
+linter/tests/CI, the schema-only database layer, the placeholder ingestion and
+scheduler — are fixed. **M0, M1, and M2 are complete.**
 
 ---
 
@@ -224,8 +229,9 @@ learner-confirmed cause, status lifecycle), `Intervention`, `TransferAttempt`
 (recurrence measurement), and the append-only `ReviewEvent` log (rating,
 latency, algorithm version, opaque pre/post scheduler state — recomputable).
 
-FSRS should be introduced **behind an adapter**, preserving `Again / Hard / Good /
-Easy`, latency, and algorithm version as raw events so schedules can be
+FSRS is **implemented behind an adapter** (`@study-os/scheduler`): `again /
+hard / good / easy` ratings, latency, and the algorithm version are preserved
+as raw `ReviewEvent`s with opaque before/after state, so schedules can be
 recomputed later.
 
 ### AI quality & safety gates (targets, not yet met)
@@ -243,9 +249,9 @@ uploaded documents as untrusted data, never as instructions.
 
 This repo is kept as a **Labs / Experimental** project under a conditional gate:
 
-- **By 2026-08-13:** a named owner (DRI); M0 CI green; a runnable API and a
-  text-only demo; over-claims removed from this README; a license decision (or a
-  clear *license pending* notice).
+- **By 2026-08-13:** a named owner (DRI — still needed); ~~M0 CI green~~ ✓;
+  ~~a runnable API and a text-only demo~~ ✓; ~~over-claims removed from this
+  README~~ ✓; ~~a license decision~~ ✓ (Apache-2.0).
 - **By 2026-09-12:** one exam vertical; a source-grounded remediation slice;
   publishable golden fixtures and evaluation results; a small (10–20 person)
   comparison test; and evidence that cause-based remediation adds value over
@@ -297,15 +303,19 @@ pnpm smoke:db                    # built client ↔ migrated DB round-trip check
 ```
 
 The API listens on `PORT` (default `3000`, host `127.0.0.1`) and exposes
-`/healthz`, `/readyz`, and `/api/demo/study-loop`.
+`/healthz`, `/readyz`, `POST/GET /api/sources`, `GET /api/sources/:id`,
+`POST /api/review/events`, `GET /api/review/queue`, and the demo routes
+(`/api/demo/study-loop`, `POST /api/demo/summary`).
 
 ---
 
 ## Contributing
 
-Early contributions should focus on the reproducible baseline (**M0**) and the
-text-only vertical slice (**M1**). Please use **GitHub Issues** as the source of
-truth for what's actually being worked on; open an issue before large changes.
+M0–M2 are complete; current focus areas are model-backed, citation-carrying
+**quiz generation** (replacing the last stub), the **exam vertical** decision,
+and the **M3** secure-PDF/evaluation work. Please use **GitHub Issues** as the
+source of truth for what's actually being worked on; open an issue before
+large changes.
 
 ## License
 
