@@ -37,6 +37,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const firstUnit: StudyUnit = {
       id: "study-unit-1",
+      sourceId: "demo-source",
       ...ingestion.units[0],
     };
 

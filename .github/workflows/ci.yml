@@ -54,17 +54,19 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
-
+      # Migrate + seed after typecheck: tsc -b emits the dist/ artifacts that
+      # the seed script's @study-os/db import resolves to.
       - name: Apply database migrations
         run: pnpm db:migrate:deploy
 
       - name: Seed database
         run: pnpm db:seed
+
+      - name: Test (includes DB integration tests against the migrated DB)
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
 
       - name: Database smoke test (built client against migrated DB)
         run: pnpm smoke:db
