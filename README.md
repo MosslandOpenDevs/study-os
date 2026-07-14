@@ -10,8 +10,8 @@ what runs today (see [Implementation status](#implementation-status)).
 > This repository contains a working **text-only vertical slice** — Korean
 > ingestion with resolvable citations, fail-closed summary generation, an
 > FSRS review scheduler, and upload/review APIs over PostgreSQL — but it is
-> **not** yet a usable study service: no auth, no quiz generation, no PDF
-> support, no deployment (see [Implementation status](#implementation-status)).
+> **not** yet a usable study service: no auth, no PDF support, no deployment
+> (see [Implementation status](#implementation-status)).
 >
 > This is an *experimental reference implementation*, not a released product.
 > The code is open source under **Apache-2.0** (see [LICENSE](LICENSE));
@@ -45,8 +45,11 @@ gate is not met it will be archived rather than developed further.
   algorithm version, opaque state snapshots), and a prioritized daily queue
   where recurring errors outrank overdue time — served via
   `GET /api/review/queue` and `POST /api/review/events`.
-- One remaining **stub package** (quiz-engine): placeholder generation and
-  exact-match grading, no LLM calls.
+- An **evidence-cited quiz engine** (`@study-os/quiz-engine`): the model emits
+  verbatim evidence quotes that are anchored to verified offsets (fail-closed
+  if a quote is not found in the source); Claude-backed or deterministic mock;
+  Korean-aware normalized grading; wrong answers auto-open an `ErrorEpisode`
+  via `POST /api/quiz-items/:id/attempts`.
 - A **Fastify API** (`apps/api`) with health/readiness endpoints (readiness
   verifies database connectivity when a database is configured), graceful
   shutdown, and the first product endpoints: text source upload
@@ -128,7 +131,7 @@ pending user validation and item-usage rights.
 | --- | --- | --- |
 | Domain types (`@study-os/core`) | ✅ Implemented | TypeScript interfaces + a product-vision string; no runtime logic |
 | Ingestion (`@study-os/ingestion`) | ✅ Implemented (text) | Deterministic Korean-aware segmentation (Markdown/`제N장`/numbered/가나다 headings + paragraphs) with citation offsets satisfying `rawText.slice(start, end) === content`; validation; persisted transactionally with real ids via `@study-os/db` (integration-tested against Postgres in CI). PDF ingestion is M3. |
-| Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
+| Quiz generation (`@study-os/quiz-engine`) | ✅ Implemented | Quote-anchored citations (model emits verbatim quotes; provider resolves offsets deterministically — **fail-closed** if a quote isn't found in the source); type-specific validation (MCQ 3-5 choices/1 correct, `____` blanks); Claude-backed (structured outputs, adaptive thinking) or deterministic mock; Korean-aware normalized grading (NFC/whitespace/punctuation); `POST /api/units/:id/quiz` persists items with revision-mapped `SourceSpan` citations; wrong attempts auto-open `ErrorEpisode`s |
 | Review scheduler (`@study-os/scheduler`) | ✅ Implemented | FSRS (ts-fsrs 5) behind an adapter — no hand-rolled algorithm; deterministic (fuzz off); JSON-serializable opaque card state; daily queue prioritizes recurring errors (failed transfers) over overdue time; validation + 12 unit tests; wired to `POST /api/review/events` (raw-event append) and `GET /api/review/queue` |
 | Web app (`apps/web`) | 🟡 First screens | Study-unit list (`GET /api/sources` via dev proxy, loading/error/empty states, citation badges) + summary card rendering mock data with an AI-generated provenance label; Testing Library tests. Not yet a full study flow. |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
@@ -157,7 +160,7 @@ packages/
   core/           # shared TypeScript domain types
   db/             # Prisma 7 client factory (PostgreSQL driver adapter)
   ingestion/      # Korean-aware segmentation with resolvable citation offsets
-  quiz-engine/    # placeholder quiz generation + exact-match grading
+  quiz-engine/    # evidence-cited quiz generation + Korean-aware grading
   scheduler/      # FSRS adapter (ts-fsrs) + prioritized daily review queue
   summary/        # Korean summary provider: Claude-backed or deterministic mock
 prisma/
@@ -196,9 +199,10 @@ removed; a UI package will be created when there is real shared UI code.
 
 - **No authentication** — `userId` travels in request bodies; must be replaced
   before any public exposure.
-- **Quiz generation is still a stub** — no model-backed, citation-carrying
-  question generation yet (the schema is ready for it).
 - **No PDF ingestion or object storage** (M3 by design).
+- **Cause attribution and interventions are not yet served over the API** —
+  wrong answers open `ErrorEpisode`s automatically, but the suggest/confirm
+  cause flow and intervention generation are the next slice.
 
 Earlier gaps — the git-ignored lockfile, the non-runnable API, the missing
 linter/tests/CI, the schema-only database layer, the placeholder ingestion and
@@ -311,11 +315,12 @@ The API listens on `PORT` (default `3000`, host `127.0.0.1`) and exposes
 
 ## Contributing
 
-M0–M2 are complete; current focus areas are model-backed, citation-carrying
-**quiz generation** (replacing the last stub), the **exam vertical** decision,
-and the **M3** secure-PDF/evaluation work. Please use **GitHub Issues** as the
-source of truth for what's actually being worked on; open an issue before
-large changes.
+M0–M2 are complete and every package is model-backed or fully implemented —
+there are no stubs left. Current focus areas: the **suggest/confirm cause
+flow** (serving `ErrorEpisode` attribution + interventions over the API), the
+**exam vertical** decision, and the **M3** secure-PDF/evaluation work. Please
+use **GitHub Issues** as the source of truth for what's actually being worked
+on; open an issue before large changes.
 
 ## License
 

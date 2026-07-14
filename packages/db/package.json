@@ -21,7 +21,8 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@study-os/ingestion": "workspace:*"
+    "@study-os/ingestion": "workspace:*",
+    "@study-os/quiz-engine": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

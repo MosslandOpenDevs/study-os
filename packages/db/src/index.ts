@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./generated/prisma/client.js";
 
 export * from "./ingestion.js";
+export * from "./quiz.js";
 export { PrismaClient };
 
 export interface CreatePrismaClientOptions {

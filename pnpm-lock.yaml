@@ -133,6 +133,9 @@ importers:
       '@study-os/ingestion':
         specifier: workspace:*
         version: link:../ingestion
+      '@study-os/quiz-engine':
+        specifier: workspace:*
+        version: link:../quiz-engine
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -159,10 +162,13 @@ importers:
 
   packages/quiz-engine:
     dependencies:
-      '@study-os/core':
-        specifier: workspace:*
-        version: link:../core
+      '@anthropic-ai/sdk':
+        specifier: ^0.111.0
+        version: 0.111.0(zod@4.4.3)
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
