@@ -1,4 +1,5 @@
 import type { ErrorNotebookEntry, StudyUnit } from "@study-os/core";
+import type { PrismaClient } from "@study-os/db";
 import { buildIngestionResult } from "@study-os/ingestion";
 import { generateQuizDraft } from "@study-os/quiz-engine";
 import { buildReviewTask } from "@study-os/scheduler";
@@ -10,16 +11,20 @@ import {
   type TonePreset,
 } from "@study-os/summary";
 import Fastify, { type FastifyInstance } from "fastify";
+import { registerSourceRoutes } from "./routes/sources.js";
 
 export interface BuildAppOptions {
   logger?: boolean;
   /** Injectable for tests; defaults to Anthropic when ANTHROPIC_API_KEY is set, else mock. */
   summaryProvider?: SummaryProvider;
+  /** Database client. When absent, database-backed routes return 503. */
+  prisma?: PrismaClient;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
   const summaryProvider = options.summaryProvider ?? createDefaultSummaryProvider();
+  const prisma = options.prisma;
 
   app.get("/", async () => ({
     name: "study-os-api",
@@ -29,9 +34,21 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Liveness: the process is up and the event loop responds.
   app.get("/healthz", async () => ({ status: "ok" }));
 
-  // Readiness: the server can serve traffic. No external dependencies exist
-  // yet; once a database is wired in (M1), this must also verify connectivity.
-  app.get("/readyz", async () => ({ status: "ready" }));
+  // Readiness: when a database is configured it must actually answer;
+  // without one the API is still "ready" for its database-less routes.
+  app.get("/readyz", async (_request, reply) => {
+    if (prisma) {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+      } catch {
+        return reply.status(503).send({ status: "unavailable", reason: "database unreachable" });
+      }
+      return { status: "ready", database: "ok" };
+    }
+    return { status: "ready" };
+  });
+
+  registerSourceRoutes(app, prisma);
 
   // Demo pipeline across all workspace packages. This route exists to prove at
   // runtime that @study-os/ingestion, quiz-engine, and scheduler resolve as
