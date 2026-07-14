@@ -30,9 +30,12 @@ archived rather than developed further.
 - Shared domain **types** in `@study-os/core` and a Prisma **schema** describing
   users, sources, study units, quizzes, attempts, an error notebook, and review
   tasks.
-- Three **stub algorithm packages** (ingestion, quiz-engine, scheduler) that
-  build and pass tests but contain placeholder logic, no LLM calls, and no
-  persistence.
+- A working **text ingestion pipeline** (`@study-os/ingestion`): deterministic,
+  Korean-aware segmentation into study units whose citation offsets always
+  resolve back to the exact source text, persisted atomically with real ids
+  through `@study-os/db`.
+- Two **stub algorithm packages** (quiz-engine, scheduler) that build and pass
+  tests but contain placeholder logic and no LLM calls.
 - A minimal **Fastify API** (`apps/api`) that boots, serves `/healthz`,
   `/readyz`, and a demo route, and shuts down gracefully — no product
   endpoints yet.
@@ -112,7 +115,7 @@ pending user validation and item-usage rights.
 | Area | State | Notes |
 | --- | --- | --- |
 | Domain types (`@study-os/core`) | ✅ Implemented | TypeScript interfaces + a product-vision string; no runtime logic |
-| Ingestion (`@study-os/ingestion`) | 🟡 Stub | Blank-line paragraph split only; `sourceId` hardcoded to `"pending-source-id"`; citation offsets never populated |
+| Ingestion (`@study-os/ingestion`) | ✅ Implemented (text) | Deterministic Korean-aware segmentation (Markdown/`제N장`/numbered/가나다 headings + paragraphs) with citation offsets satisfying `rawText.slice(start, end) === content`; validation; persisted transactionally with real ids via `@study-os/db` (integration-tested against Postgres in CI). PDF ingestion is M3. |
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
 | Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |

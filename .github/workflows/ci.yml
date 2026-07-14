@@ -48,23 +48,23 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      - name: Apply database migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Seed database
+        run: pnpm db:seed
+
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
+      - name: Test (includes DB integration tests against the migrated DB)
         run: pnpm test
 
       - name: Build
         run: pnpm build
-
-      - name: Apply database migrations
-        run: pnpm db:migrate:deploy
-
-      - name: Seed database
-        run: pnpm db:seed
 
       - name: Database smoke test (built client against migrated DB)
         run: pnpm smoke:db
