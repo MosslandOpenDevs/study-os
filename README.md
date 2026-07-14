@@ -42,8 +42,12 @@ archived rather than developed further.
   test of the built API).
 - A set of **planning documents** in [`docs/`](docs/).
 
-**What is _not_ here yet:** product API endpoints, a database
-client/migrations, any real LLM or PDF processing, storage, or authentication.
+- A **database layer** (`packages/db`): Prisma 7 with the PostgreSQL driver
+  adapter, a first migration, and an idempotent seed — applied and
+  smoke-tested against real Postgres in CI.
+
+**What is _not_ here yet:** product API endpoints, any real LLM or PDF
+processing, storage, or authentication.
 
 ---
 
@@ -113,7 +117,7 @@ pending user validation and item-usage rights.
 | Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
 | API (`apps/api`) | 🟡 Minimal but runnable | Fastify server with `/healthz`, `/readyz`, graceful shutdown, and a demo route proving runtime package resolution; no product endpoints |
-| Database (`prisma/schema.prisma`) | 🟡 Schema only | Schema present (`prisma-client-js`); no client generation, migrations, seed, or Postgres wiring |
+| Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (`prisma-client` generator, PostgreSQL driver adapter), first migration, idempotent seed, `.env.example`, docker-compose Postgres; CI applies the migration and smoke-tests the built client against a real database |
 | LLM / PDF / storage | ❌ Missing | No model calls, PDF parser, or object storage |
 | Tests / lint / CI | ✅ Implemented | Biome lint, Vitest unit tests, GitHub Actions with a frozen-lockfile install and a runtime smoke test of the built API |
 
@@ -134,13 +138,18 @@ apps/
   api/            # Fastify API: /healthz, /readyz, demo route, graceful shutdown
 packages/
   core/           # shared TypeScript domain types
+  db/             # Prisma 7 client factory (PostgreSQL driver adapter)
   ingestion/      # text-split stub
   quiz-engine/    # placeholder quiz generation + exact-match grading
   scheduler/      # fixed-interval review stub
 prisma/
-  schema.prisma   # data model (no migrations yet)
+  schema.prisma   # data model
+  migrations/     # SQL migrations (applied in CI against real Postgres)
+  seed.ts         # idempotent dev seed
+prisma.config.ts  # Prisma 7 config: schema/migrations paths, seed, datasource
 scripts/
   smoke-api.mjs   # boots the built API artifact and verifies it end to end
+  smoke-db.mjs    # verifies the built client against the migrated, seeded DB
 docs/             # planning notes: product brief, MVP, roadmap, personas,
                   # architecture, backlog
 ```
@@ -161,17 +170,18 @@ removed; a UI package will be created when there is real shared UI code.
 - **Packages/API:** TypeScript project references building to `dist` (packages
   are consumed through their built `exports`, not source aliases), ESM,
   Fastify 5, `tsx` for dev.
-- **Database:** Prisma schema targeting PostgreSQL (schema only).
+- **Database:** Prisma 7 (`prisma-client` generator into `packages/db`,
+  PostgreSQL driver adapter, config in `prisma.config.ts`), migrations + seed,
+  local Postgres via docker-compose.
 
 ### Known baseline gaps
 
-- Prisma has no client output, migrations, seed, or `.env.example` — this is
-  the remaining M0 item (issue #14).
 - The API serves only health/demo endpoints; product endpoints arrive with the
   M1 vertical slice.
 
-Earlier gaps — the git-ignored lockfile, the non-runnable API, and the missing
-linter/tests/CI — are fixed.
+Earlier gaps — the git-ignored lockfile, the non-runnable API, the missing
+linter/tests/CI, and the schema-only database layer — are fixed. **M0 is
+complete.**
 
 ---
 
@@ -250,11 +260,22 @@ Corepack, `corepack enable` picks it up automatically).
 ```bash
 pnpm install --frozen-lockfile   # reproducible install from the committed lockfile
 pnpm lint                        # Biome
-pnpm typecheck                   # tsc -b across all project references + web
+pnpm typecheck                   # prisma generate + tsc -b across all references + web
 pnpm test                        # Vitest unit tests
-pnpm build                       # packages + API to dist/, web via Vite
+pnpm build                       # prisma generate + packages/API to dist/, web via Vite
 pnpm smoke                       # boots the built API and verifies health + shutdown
 pnpm dev                         # web intro page + API (tsx watch) in parallel
+```
+
+Database (optional locally; CI always runs it):
+
+```bash
+cp .env.example .env             # DATABASE_URL (defaults match docker-compose.yml)
+docker compose up -d             # local Postgres 17
+pnpm db:migrate:dev              # create/apply migrations in development
+pnpm db:migrate:deploy           # apply committed migrations (what CI runs)
+pnpm db:seed                     # idempotent demo data
+pnpm smoke:db                    # built client ↔ migrated DB round-trip check
 ```
 
 The API listens on `PORT` (default `3000`, host `127.0.0.1`) and exposes

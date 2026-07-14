@@ -8,3 +8,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Generated Prisma client (recreated by `pnpm db:generate`)
+packages/db/src/generated/
