@@ -163,9 +163,9 @@ importers:
 
   packages/scheduler:
     dependencies:
-      '@study-os/core':
-        specifier: workspace:*
-        version: link:../core
+      ts-fsrs:
+        specifier: ^5.4.1
+        version: 5.4.1
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -1512,6 +1512,10 @@ packages:
   ts-algebra@2.0.0:
     resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
 
+  ts-fsrs@5.4.1:
+    resolution: {integrity: sha512-mOp9+oexJexBTkwjg/jQI1aSUQRLIAvbimeKHLSmVdNJPwObugFNKmZkoggH5d6kZ0uaWLboP1Al1DnXAfIb9w==}
+    engines: {node: '>=20.0.0'}
+
   tsx@4.23.1:
     resolution: {integrity: sha512-GQHnkIfxyx1wYCOS/wonik5MVRZU9hi1TEZmzGZSCJB1y9YgoZ8H6itNE/u4suE+yLmOzuE4E5S4TZ/ZX2wcWQ==}
     engines: {node: '>=18.0.0'}
@@ -2839,6 +2843,8 @@ snapshots:
   toad-cache@3.7.4: {}
 
   ts-algebra@2.0.0: {}
+
+  ts-fsrs@5.4.1: {}
 
   tsx@4.23.1:
     dependencies:

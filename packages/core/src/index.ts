@@ -6,11 +6,6 @@ export type GoalType = "exam" | "course" | "custom";
 export type GoalStatus = "active" | "completed" | "paused";
 export type QuizType = "multiple-choice" | "short-answer" | "fill-in-the-blank";
 
-/** @deprecated Replaced by ErrorCause in the ErrorEpisode remediation model (issue #2). */
-export type ErrorType = "concept-gap" | "careless-mistake" | "misread-question" | "time-pressure";
-/** @deprecated Replaced by the raw ReviewEvent log (issue #2); removal tracked by issue #5. */
-export type ReviewStatus = "pending" | "done" | "skipped";
-
 // ---------------------------------------------------------------------------
 // Remediation loop domain (issue #2): ErrorEpisode replaces the old
 // error-notebook. The model proposes a cause; only the learner confirms it.
@@ -167,32 +162,4 @@ export interface Attempt {
   submittedAnswer: string;
   isCorrect: boolean;
   createdAt: string;
-}
-
-/**
- * @deprecated Replaced by ErrorEpisode (issue #2). The database table is
- * gone; this type survives only for the scheduler stub until issue #5 lands.
- */
-export interface ErrorNotebookEntry {
-  id: string;
-  userId: string;
-  quizItemId: string;
-  attemptId: string;
-  errorType: ErrorType;
-  note?: string;
-  nextReviewAt?: string;
-  reviewCount: number;
-}
-
-/**
- * @deprecated Replaced by the raw ReviewEvent log (issue #2). The database
- * table is gone; this type survives only for the scheduler stub until issue
- * #5 lands.
- */
-export interface ReviewTask {
-  id: string;
-  userId: string;
-  notebookEntryId: string;
-  scheduledAt: string;
-  status: ReviewStatus;
 }

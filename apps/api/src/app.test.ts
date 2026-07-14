@@ -35,8 +35,9 @@ describe("demo study-loop pipeline", () => {
     const body = res.json();
     expect(body.ingestion.units).toHaveLength(2);
     expect(body.quizDraft).toHaveLength(2);
-    expect(body.reviewTask.status).toBe("pending");
-    expect(new Date(body.reviewTask.scheduledAt).getTime()).toBeGreaterThan(Date.now());
+    expect(body.review.algorithm).toMatch(/^ts-fsrs /);
+    expect(body.review.reps).toBe(1);
+    expect(new Date(body.review.nextDue).getTime()).toBeGreaterThan(Date.now());
   });
 });
 

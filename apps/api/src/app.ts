@@ -1,8 +1,8 @@
-import type { ErrorNotebookEntry, StudyUnit } from "@study-os/core";
+import type { StudyUnit } from "@study-os/core";
 import type { PrismaClient } from "@study-os/db";
 import { buildIngestionResult } from "@study-os/ingestion";
 import { generateQuizDraft } from "@study-os/quiz-engine";
-import { buildReviewTask } from "@study-os/scheduler";
+import { applyReview } from "@study-os/scheduler";
 import {
   createDefaultSummaryProvider,
   SummaryGenerationError,
@@ -11,6 +11,7 @@ import {
   type TonePreset,
 } from "@study-os/summary";
 import Fastify, { type FastifyInstance } from "fastify";
+import { registerReviewRoutes } from "./routes/review.js";
 import { registerSourceRoutes } from "./routes/sources.js";
 
 export interface BuildAppOptions {
@@ -49,6 +50,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   registerSourceRoutes(app, prisma);
+  registerReviewRoutes(app, prisma);
 
   // Demo pipeline across all workspace packages. This route exists to prove at
   // runtime that @study-os/ingestion, quiz-engine, and scheduler resolve as
@@ -74,20 +76,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       count: 2,
     });
 
-    const notebookEntry: ErrorNotebookEntry = {
-      id: "entry-1",
-      userId: "demo-user",
-      quizItemId: "quiz-item-1",
-      attemptId: "attempt-1",
-      errorType: "concept-gap",
-      note: "첫 번째 개념 복습 필요",
-      nextReviewAt: undefined,
-      reviewCount: 0,
+    // First FSRS review of a fresh card: proves the scheduler resolves and
+    // schedules at runtime.
+    const review = applyReview(null, "good", new Date());
+
+    return {
+      ingestion,
+      quizDraft,
+      review: {
+        algorithm: review.algorithm,
+        nextDue: review.due.toISOString(),
+        reps: review.after.reps,
+      },
     };
-
-    const reviewTask = buildReviewTask(notebookEntry);
-
-    return { ingestion, quizDraft, reviewTask };
   });
 
   // Korean summary generation for a study unit (issues #10/#4). Uses the
