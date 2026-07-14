@@ -1,7 +1,6 @@
-import type { StudyUnit } from "@study-os/core";
 import type { PrismaClient } from "@study-os/db";
 import { buildIngestionResult } from "@study-os/ingestion";
-import { generateQuizDraft } from "@study-os/quiz-engine";
+import { createDefaultQuizProvider, type QuizProvider } from "@study-os/quiz-engine";
 import { applyReview } from "@study-os/scheduler";
 import {
   createDefaultSummaryProvider,
@@ -11,6 +10,7 @@ import {
   type TonePreset,
 } from "@study-os/summary";
 import Fastify, { type FastifyInstance } from "fastify";
+import { registerQuizRoutes } from "./routes/quiz.js";
 import { registerReviewRoutes } from "./routes/review.js";
 import { registerSourceRoutes } from "./routes/sources.js";
 
@@ -18,6 +18,8 @@ export interface BuildAppOptions {
   logger?: boolean;
   /** Injectable for tests; defaults to Anthropic when ANTHROPIC_API_KEY is set, else mock. */
   summaryProvider?: SummaryProvider;
+  /** Injectable for tests; defaults to Anthropic when ANTHROPIC_API_KEY is set, else mock. */
+  quizProvider?: QuizProvider;
   /** Database client. When absent, database-backed routes return 503. */
   prisma?: PrismaClient;
 }
@@ -25,6 +27,7 @@ export interface BuildAppOptions {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
   const summaryProvider = options.summaryProvider ?? createDefaultSummaryProvider();
+  const quizProvider = options.quizProvider ?? createDefaultQuizProvider();
   const prisma = options.prisma;
 
   app.get("/", async () => ({
@@ -51,6 +54,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   registerSourceRoutes(app, prisma);
   registerReviewRoutes(app, prisma);
+  registerQuizRoutes(app, prisma, quizProvider);
 
   // Demo pipeline across all workspace packages. This route exists to prove at
   // runtime that @study-os/ingestion, quiz-engine, and scheduler resolve as
@@ -61,20 +65,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       userId: "demo-user",
       title: "샘플 강의",
       sourceType: "text",
-      rawText: "첫 번째 개념 문단입니다.\n\n두 번째 개념 문단입니다.",
+      rawText:
+        "프로세스는 실행 중인 프로그램이며 운영체제 자원 배분의 기본 단위입니다.\n\n스레드는 프로세스 내부의 실행 흐름이며 같은 주소 공간을 공유합니다.",
     });
 
-    const firstUnit: StudyUnit = {
-      id: "study-unit-1",
-      sourceId: "demo-source",
-      ...ingestion.units[0],
-    };
-
-    const quizDraft = generateQuizDraft({
-      studyUnit: firstUnit,
+    const firstUnit = ingestion.units[0];
+    const quiz = await quizProvider.generateQuiz({
+      unit: { title: firstUnit?.title ?? "샘플", content: firstUnit?.content ?? "" },
       quizType: "short-answer",
       count: 2,
     });
+    const quizDraft = quiz.items;
 
     // First FSRS review of a fresh card: proves the scheduler resolves and
     // schedules at runtime.

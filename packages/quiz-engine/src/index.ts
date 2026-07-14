@@ -1,28 +1,38 @@
-import type { QuizItem, QuizType, StudyUnit } from "@study-os/core";
+export {
+  ANTHROPIC_QUIZ_PROMPT_VERSION,
+  AnthropicQuizProvider,
+  type AnthropicQuizProviderOptions,
+  DEFAULT_QUIZ_MODEL,
+} from "./anthropic.js";
+export { resolveQuotesToCitations } from "./citations.js";
+export {
+  type GradableItem,
+  type GradingResult,
+  gradeShortAnswer,
+  normalizeAnswer,
+} from "./grading.js";
+export { MOCK_QUIZ_PROMPT_VERSION, MockQuizProvider } from "./mock.js";
+export * from "./types.js";
+export {
+  MAX_ITEMS,
+  MAX_MCQ_CHOICES,
+  MIN_CONTENT_LENGTH,
+  MIN_MCQ_CHOICES,
+  validateQuizItems,
+  validateQuizRequest,
+} from "./validate.js";
 
-export interface QuizGenerationRequest {
-  studyUnit: StudyUnit;
-  quizType: QuizType;
-  count: number;
-}
+import { AnthropicQuizProvider } from "./anthropic.js";
+import { MockQuizProvider } from "./mock.js";
+import type { QuizProvider } from "./types.js";
 
-export interface QuizDraft extends Omit<QuizItem, "id" | "quizSetId"> {}
-
-export function generateQuizDraft(request: QuizGenerationRequest): QuizDraft[] {
-  const basePrompt = request.studyUnit.content.slice(0, 180).trim();
-
-  return Array.from({ length: request.count }, (_, index) => ({
-    prompt: `Question ${index + 1}: Explain the key point of "${request.studyUnit.title}" based on: ${basePrompt}`,
-    answer: `Model answer for ${request.studyUnit.title} (${request.quizType})`,
-    explanation: "This is a placeholder explanation to be replaced by model-backed generation.",
-    difficulty: 1,
-    createdAt: new Date().toISOString(),
-  }));
-}
-
-export function gradeAnswer(expectedAnswer: string, submittedAnswer: string): boolean {
-  const normalizedExpected = expectedAnswer.trim().toLowerCase();
-  const normalizedSubmitted = submittedAnswer.trim().toLowerCase();
-
-  return normalizedExpected.length > 0 && normalizedExpected === normalizedSubmitted;
+/**
+ * Anthropic-backed provider when ANTHROPIC_API_KEY is set, otherwise the
+ * deterministic offline mock — dev/CI never require a key or network.
+ */
+export function createDefaultQuizProvider(): QuizProvider {
+  if (process.env.ANTHROPIC_API_KEY) {
+    return new AnthropicQuizProvider();
+  }
+  return new MockQuizProvider();
 }
