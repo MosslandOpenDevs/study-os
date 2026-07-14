@@ -12,9 +12,10 @@ what runs today (see [Implementation status](#implementation-status)).
 > but serves only health/demo endpoints. It is **not** a usable study service
 > (see [Implementation status](#implementation-status)).
 >
-> This is an *experimental reference implementation*, not a released product and
-> not (yet) open source: **no LICENSE has been chosen**, so treat the code as
-> *all rights reserved / license pending*.
+> This is an *experimental reference implementation*, not a released product.
+> The code is open source under **Apache-2.0** (see [LICENSE](LICENSE));
+> benchmark/corpus data is licensed separately (see
+> [docs/data-licensing.md](docs/data-licensing.md)).
 
 All code to date was authored on a single day (2026-04-10) as an initial
 scaffold. The repository is kept under a **conditional-maintenance gate** with
@@ -308,8 +309,10 @@ truth for what's actually being worked on; open an issue before large changes.
 
 ## License
 
-**None yet.** No license has been selected, so all rights are reserved by default
-— do not assume MIT or any other permissive terms. A license (likely Apache-2.0
-or AGPL-3.0, pending a rights review) will be added before any wider adoption is
-encouraged. Benchmark/corpus data, if published, will be licensed separately from
-the code with a per-item `creator / source_url / license` manifest.
+**Code: [Apache-2.0](LICENSE)** (chosen to encourage adoption of the reference
+engine; includes an explicit patent grant). See also [NOTICE](NOTICE).
+
+**Benchmark/corpus data is licensed separately from the code** — every
+published dataset must carry a per-item `creator / source_url / license`
+manifest, and unlicensed material is never committed. Full policy:
+[docs/data-licensing.md](docs/data-licensing.md).
