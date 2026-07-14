@@ -14,6 +14,7 @@
     "@study-os/ingestion": "workspace:*",
     "@study-os/quiz-engine": "workspace:*",
     "@study-os/scheduler": "workspace:*",
+    "@study-os/summary": "workspace:*",
     "fastify": "^5.10.0"
   },
   "devDependencies": {
