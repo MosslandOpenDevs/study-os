@@ -11,6 +11,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
 enum GoalType {
   exam
   course
@@ -35,30 +39,80 @@ enum QuizType {
   fill_in_the_blank
 }
 
-enum ErrorType {
+/// Confirmed-cause taxonomy for the remediation loop. `faulty_item` means the
+/// generated question itself was defective: attribution stops and the item is
+/// discarded/regenerated instead of blaming the learner.
+enum ErrorCause {
   concept_gap
-  careless_mistake
-  misread_question
+  condition_misread
+  procedure_slip
   time_pressure
+  faulty_item
 }
 
-enum ReviewStatus {
-  pending
-  done
-  skipped
+/// ErrorEpisode lifecycle. The model may SUGGEST a cause, but only the
+/// learner's confirmation moves the episode to cause_confirmed.
+enum ErrorEpisodeStatus {
+  open
+  cause_confirmed
+  intervened
+  resolved
+  item_faulty
 }
+
+enum InterventionKind {
+  reexplanation
+  prerequisite_check
+  condition_drill
+  checklist
+  discrimination_set
+  timed_set
+  item_regenerated
+}
+
+enum TransferResult {
+  pending
+  passed
+  failed
+}
+
+enum ReviewRating {
+  again
+  hard
+  good
+  easy
+}
+
+enum GenerationKind {
+  summary
+  quiz
+  cause_suggestion
+  intervention
+  transfer_item
+}
+
+enum GradingMethod {
+  exact_match
+  normalized_match
+  model_graded
+  manual
+}
+
+// ---------------------------------------------------------------------------
+// Identity & goals
+// ---------------------------------------------------------------------------
 
 model User {
-  id           String            @id @default(cuid())
-  displayName  String
-  locale       String            @default("ko-KR")
-  timezone     String            @default("Asia/Seoul")
-  createdAt    DateTime          @default(now())
-  studyGoals   StudyGoal[]
-  studySources StudySource[]
-  attempts     Attempt[]
-  notebook     ErrorNotebookEntry[]
-  reviewTasks  ReviewTask[]
+  id            String         @id @default(cuid())
+  displayName   String
+  locale        String         @default("ko-KR")
+  timezone      String         @default("Asia/Seoul")
+  createdAt     DateTime       @default(now())
+  studyGoals    StudyGoal[]
+  studySources  StudySource[]
+  attempts      Attempt[]
+  errorEpisodes ErrorEpisode[]
+  reviewEvents  ReviewEvent[]
 }
 
 model StudyGoal {
@@ -73,102 +127,263 @@ model StudyGoal {
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// ---------------------------------------------------------------------------
+// Sources, revisions, spans — the evidence backbone
+// ---------------------------------------------------------------------------
+
 model StudySource {
-  id               String          @id @default(cuid())
+  id               String           @id @default(cuid())
   userId           String
   title            String
   sourceType       StudySourceType
   originalFilename String?
   storageUrl       String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revisions        SourceRevision[]
   studyUnits       StudyUnit[]
 }
 
-model StudyUnit {
-  id            String      @id @default(cuid())
+/// Immutable snapshot of the source text. Citations reference offsets into
+/// THIS text, so keeping it verbatim is what makes every citation resolvable
+/// forever — even after the source is re-uploaded (new revision).
+model SourceRevision {
+  id            String       @id @default(cuid())
   sourceId      String
-  title         String
-  content       String
-  orderIndex    Int
-  citationStart Int?
-  citationEnd   Int?
-  createdAt     DateTime    @default(now())
-  source        StudySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  summaryCard   SummaryCard?
-  quizSets      QuizSet[]
+  revision      Int
+  rawText       String
+  contentSha256 String
+  contentLength Int
+  createdAt     DateTime     @default(now())
+  source        StudySource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  spans         SourceSpan[]
+  studyUnits    StudyUnit[]
+
+  @@unique([sourceId, revision])
+}
+
+/// A half-open [start, end) offset range into a SourceRevision's rawText.
+/// The unit of evidence: quiz items cite spans, not vague page references.
+model SourceSpan {
+  id               String             @id @default(cuid())
+  sourceRevisionId String
+  start            Int
+  end              Int
+  createdAt        DateTime           @default(now())
+  sourceRevision   SourceRevision     @relation(fields: [sourceRevisionId], references: [id], onDelete: Cascade)
+  quizItemCitations QuizItemCitation[]
+}
+
+model StudyUnit {
+  id               String          @id @default(cuid())
+  sourceId         String
+  sourceRevisionId String
+  title            String
+  content          String
+  orderIndex       Int
+  citationStart    Int?
+  citationEnd      Int?
+  createdAt        DateTime        @default(now())
+  source           StudySource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceRevision   SourceRevision  @relation(fields: [sourceRevisionId], references: [id], onDelete: Cascade)
+  summaryCard      SummaryCard?
+  quizSets         QuizSet[]
+}
+
+// ---------------------------------------------------------------------------
+// Generation provenance
+// ---------------------------------------------------------------------------
+
+/// One model-generation run. Everything AI-generated links back to one of
+/// these so outputs stay attributable, reproducible, and costable.
+model GenerationRun {
+  id            String         @id @default(cuid())
+  kind          GenerationKind
+  provider      String
+  model         String
+  promptVersion String
+  inputSha256   String
+  inputTokens   Int?
+  outputTokens  Int?
+  costUsd       Decimal?       @db.Decimal(10, 6)
+  createdAt     DateTime       @default(now())
+  summaryCards  SummaryCard[]
+  quizItems     QuizItem[]
+  interventions Intervention[]
+  errorEpisodes ErrorEpisode[] @relation("SuggestedByRun")
 }
 
 model SummaryCard {
-  id              String    @id @default(cuid())
-  studyUnitId      String    @unique
-  shortSummary     String
-  keyConcepts      String[]
-  confusionPoints  String[]
-  tonePreset       String
-  createdAt        DateTime  @default(now())
-  studyUnit        StudyUnit @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  studyUnitId     String         @unique
+  shortSummary    String
+  keyConcepts     String[]
+  confusionPoints String[]
+  tonePreset      String
+  generationRunId String?
+  createdAt       DateTime       @default(now())
+  studyUnit       StudyUnit      @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
+  generationRun   GenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
 }
 
+// ---------------------------------------------------------------------------
+// Quiz items and attempts
+// ---------------------------------------------------------------------------
+
 model QuizSet {
-  id         String    @id @default(cuid())
+  id          String     @id @default(cuid())
   studyUnitId String
-  title      String
-  quizType   QuizType
-  createdAt  DateTime  @default(now())
-  studyUnit  StudyUnit @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
-  quizItems  QuizItem[]
+  title       String
+  quizType    QuizType
+  createdAt   DateTime   @default(now())
+  studyUnit   StudyUnit  @relation(fields: [studyUnitId], references: [id], onDelete: Cascade)
+  quizItems   QuizItem[]
 }
 
 model QuizItem {
-  id          String    @id @default(cuid())
-  quizSetId   String
-  prompt      String
-  answer      String
-  explanation String?
-  difficulty  Int?
-  createdAt   DateTime  @default(now())
-  quizSet     QuizSet   @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
-  attempts    Attempt[]
-  notebookEntries ErrorNotebookEntry[]
+  id              String             @id @default(cuid())
+  quizSetId       String
+  prompt          String
+  answer          String
+  /// Additional accepted answers for short-answer grading (normalization aside).
+  acceptedAnswers String[]
+  /// Grading rubric for model- or manually-graded free-form answers.
+  rubric          String?
+  explanation     String?
+  difficulty      Int?
+  generationRunId String?
+  createdAt       DateTime           @default(now())
+  quizSet         QuizSet            @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
+  generationRun   GenerationRun?     @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  choices         QuizChoice[]
+  citations       QuizItemCitation[]
+  attempts        Attempt[]
+  errorEpisodes   ErrorEpisode[]
+  transferAttempts TransferAttempt[] @relation("TransferItem")
+}
+
+model QuizChoice {
+  id         String   @id @default(cuid())
+  quizItemId String
+  label      String
+  content    String
+  isCorrect  Boolean  @default(false)
+  orderIndex Int
+  quizItem   QuizItem @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+}
+
+/// Evidence link: which source spans ground this quiz item. Items without
+/// citations must not be served (fail-closed at the application layer).
+model QuizItemCitation {
+  id           String     @id @default(cuid())
+  quizItemId   String
+  sourceSpanId String
+  orderIndex   Int        @default(0)
+  quizItem     QuizItem   @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+  sourceSpan   SourceSpan @relation(fields: [sourceSpanId], references: [id], onDelete: Cascade)
+
+  @@unique([quizItemId, sourceSpanId])
 }
 
 model Attempt {
-  id              String    @id @default(cuid())
+  id              String           @id @default(cuid())
   userId          String
   quizItemId      String
   submittedAnswer String
   isCorrect       Boolean
-  createdAt       DateTime  @default(now())
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quizItem        QuizItem  @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
-  notebookEntry   ErrorNotebookEntry?
+  /// Milliseconds from item shown to answer submitted.
+  latencyMs       Int?
+  /// Learner-reported confidence, 0-100.
+  confidence      Int?
+  gradingMethod   GradingMethod    @default(exact_match)
+  createdAt       DateTime         @default(now())
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizItem        QuizItem         @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+  errorEpisode    ErrorEpisode?
+  transferAttempt TransferAttempt?
 }
 
-model ErrorNotebookEntry {
-  id           String       @id @default(cuid())
-  userId       String
-  quizItemId   String
-  attemptId    String       @unique
-  errorType    ErrorType
-  note         String?
-  nextReviewAt DateTime?
-  reviewCount  Int          @default(0)
-  createdAt    DateTime     @default(now())
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quizItem     QuizItem     @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
-  attempt      Attempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  reviewTasks  ReviewTask[]
+// ---------------------------------------------------------------------------
+// The remediation loop: ErrorEpisode → Intervention → TransferAttempt → ReviewEvent
+// ---------------------------------------------------------------------------
+
+/// One wrong answer, attributed to a cause. Replaces the old
+/// ErrorNotebookEntry: instead of merely storing the mistake, the episode
+/// tracks suggested vs learner-confirmed cause, the intervention applied,
+/// and whether the error recurs on transfer items.
+model ErrorEpisode {
+  id               String             @id @default(cuid())
+  userId           String
+  quizItemId       String
+  attemptId        String             @unique
+  status           ErrorEpisodeStatus @default(open)
+  /// Model-proposed cause — a hypothesis, never authoritative.
+  suggestedCause   ErrorCause?
+  /// GenerationRun that produced the suggestion (provenance).
+  suggestedByRunId String?
+  /// Learner-confirmed cause — the only basis for interventions.
+  confirmedCause   ErrorCause?
+  confirmedAt      DateTime?
+  note             String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizItem         QuizItem           @relation(fields: [quizItemId], references: [id], onDelete: Cascade)
+  attempt          Attempt            @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  suggestedByRun   GenerationRun?     @relation("SuggestedByRun", fields: [suggestedByRunId], references: [id], onDelete: SetNull)
+  interventions    Intervention[]
+  transferAttempts TransferAttempt[]
+  reviewEvents     ReviewEvent[]
 }
 
-model ReviewTask {
-  id              String             @id @default(cuid())
-  userId          String
-  notebookEntryId String
-  scheduledAt     DateTime
-  status          ReviewStatus       @default(pending)
-  createdAt       DateTime           @default(now())
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notebookEntry   ErrorNotebookEntry @relation(fields: [notebookEntryId], references: [id], onDelete: Cascade)
+/// A cause-specific corrective action prescribed for an episode.
+model Intervention {
+  id              String           @id @default(cuid())
+  errorEpisodeId  String
+  kind            InterventionKind
+  /// Human-readable intervention content (re-explanation text, checklist, …).
+  content         String?
+  generationRunId String?
+  createdAt       DateTime         @default(now())
+  errorEpisode    ErrorEpisode     @relation(fields: [errorEpisodeId], references: [id], onDelete: Cascade)
+  generationRun   GenerationRun?   @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+}
+
+/// A same-concept transfer item served after an intervention. Its result is
+/// the recurrence measurement the whole loop exists to produce.
+model TransferAttempt {
+  id             String         @id @default(cuid())
+  errorEpisodeId String
+  /// The transfer quiz item (a different item probing the same concept).
+  quizItemId     String
+  /// The learner's attempt at it, once made.
+  attemptId      String?        @unique
+  result         TransferResult @default(pending)
+  createdAt      DateTime       @default(now())
+  errorEpisode   ErrorEpisode   @relation(fields: [errorEpisodeId], references: [id], onDelete: Cascade)
+  quizItem       QuizItem       @relation("TransferItem", fields: [quizItemId], references: [id], onDelete: Cascade)
+  attempt        Attempt?       @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+}
+
+/// Raw, append-only review log. Scheduler state before/after is preserved
+/// verbatim (JSON) together with the algorithm version, so schedules can be
+/// recomputed from first principles when the algorithm changes.
+model ReviewEvent {
+  id                   String        @id @default(cuid())
+  userId               String
+  errorEpisodeId       String?
+  rating               ReviewRating
+  /// Milliseconds the learner took on this review.
+  latencyMs            Int?
+  /// Scheduling algorithm + version that processed this event (e.g. "fsrs-5.4.1", "fixed-v0").
+  algorithm            String
+  /// Opaque scheduler state snapshots — never interpreted retroactively.
+  schedulerStateBefore Json?
+  schedulerStateAfter  Json?
+  scheduledAt          DateTime?
+  reviewedAt           DateTime      @default(now())
+  createdAt            DateTime      @default(now())
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  errorEpisode         ErrorEpisode? @relation(fields: [errorEpisodeId], references: [id], onDelete: Cascade)
 }

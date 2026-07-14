@@ -37,6 +37,11 @@ export interface IngestionResult {
     originalFilename?: string;
   };
   /**
+   * The verbatim source text the unit offsets refer to. The persister stores
+   * it as an immutable SourceRevision so citations stay resolvable forever.
+   */
+  rawText: string;
+  /**
    * Unit drafts WITHOUT database ids. Assigning a real sourceId is the
    * persister's job (see @study-os/db persistIngestionResult) — this package
    * no longer fabricates placeholder ids.
@@ -208,6 +213,7 @@ export function buildIngestionResult(request: IngestionRequest): IngestionResult
       sourceType: request.sourceType,
       originalFilename: request.originalFilename,
     },
+    rawText: request.rawText,
     units,
   };
 }
