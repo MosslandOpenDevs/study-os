@@ -45,7 +45,9 @@ archived rather than developed further.
   verifies database connectivity), graceful shutdown, and the first product
   endpoints: text source upload (`POST /api/sources` — validated, ingested,
   persisted atomically) plus source/unit retrieval with citation offsets.
-- A static Vite + React **intro page** (`apps/web`).
+- A Vite + React **web app** (`apps/web`): study-unit list backed by the API
+  (loading/error/empty states, citation badges) and a summary-card component,
+  tested with Testing Library.
 - **Quality gates:** Biome lint, Vitest unit tests, and a GitHub Actions
   pipeline (frozen install → lint → typecheck → test → build → runtime smoke
   test of the built API).
@@ -125,7 +127,7 @@ pending user validation and item-usage rights.
 | Ingestion (`@study-os/ingestion`) | ✅ Implemented (text) | Deterministic Korean-aware segmentation (Markdown/`제N장`/numbered/가나다 headings + paragraphs) with citation offsets satisfying `rawText.slice(start, end) === content`; validation; persisted transactionally with real ids via `@study-os/db` (integration-tested against Postgres in CI). PDF ingestion is M3. |
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
 | Review scheduler (`@study-os/scheduler`) | ✅ Implemented | FSRS (ts-fsrs 5) behind an adapter — no hand-rolled algorithm; deterministic (fuzz off); JSON-serializable opaque card state; daily queue prioritizes recurring errors (failed transfers) over overdue time; validation + 14 unit tests; wired to `POST /api/review/events` (raw-event append) and `GET /api/review/queue` |
-| Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
+| Web app (`apps/web`) | 🟡 First screens | Study-unit list (`GET /api/sources` via dev proxy, loading/error/empty states, citation badges) + summary card rendering mock data with an AI-generated provenance label; Testing Library tests. Not yet a full study flow. |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (PostgreSQL driver adapter), migrations + seed, docker-compose; CI applies migrations and smoke-tests against real Postgres |
 | Remediation data model (issue #2) | ✅ Implemented | `SourceRevision`/`SourceSpan` evidence backbone, `GenerationRun` provenance, `QuizItem` with choices/rubric/citations, `Attempt` (latency/confidence), `ErrorEpisode` (suggested vs confirmed cause), `Intervention`, `TransferAttempt`, append-only `ReviewEvent`; integration-tested end to end in CI. Application wiring is M2. |
@@ -146,7 +148,7 @@ pending user validation and item-usage rights.
 
 ```text
 apps/
-  web/            # Vite + React intro page
+  web/            # Vite + React: study-unit list + summary card screens
   api/            # Fastify API: /healthz, /readyz, demo route, graceful shutdown
 packages/
   core/           # shared TypeScript domain types
@@ -279,7 +281,7 @@ pnpm typecheck                   # prisma generate + tsc -b across all reference
 pnpm test                        # Vitest unit tests
 pnpm build                       # prisma generate + packages/API to dist/, web via Vite
 pnpm smoke                       # boots the built API and verifies health + shutdown
-pnpm dev                         # web intro page + API (tsx watch) in parallel
+pnpm dev                         # web app (proxies /api → :3000) + API in parallel
 ```
 
 Database (optional locally; CI always runs it):
