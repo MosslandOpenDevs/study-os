@@ -1,6 +1,6 @@
+import { productVision } from "@study-os/core";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { productVision } from "@study-os/core";
 
 function App() {
   return (
@@ -25,20 +25,27 @@ function App() {
         <ol>
           <li>Turn source material into evidence-linked study units</li>
           <li>Generate grounded questions from those units</li>
-          <li>On a wrong answer, attribute the error to a cause (model proposes, learner confirms)</li>
+          <li>
+            On a wrong answer, attribute the error to a cause (model proposes, learner confirms)
+          </li>
           <li>Prescribe a cause-specific intervention and a transfer question</li>
           <li>Schedule review and measure whether the error recurs</li>
         </ol>
         <p style={{ color: "#666", fontSize: 13 }}>
-          This is the intended direction, not current behavior. See the README for
-          what actually runs today.
+          This is the intended direction, not current behavior. See the README for what actually
+          runs today.
         </p>
       </section>
     </main>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element #root not found");
+}
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,

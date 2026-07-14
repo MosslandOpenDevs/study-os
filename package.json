@@ -2,11 +2,21 @@
   "name": "study-os",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.11.0",
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm --parallel --filter @study-os/web --filter @study-os/api dev",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "build": "tsc -b && pnpm --filter @study-os/web build",
+    "typecheck": "tsc -b && pnpm --filter @study-os/web typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "pnpm -r test",
+    "smoke": "node scripts/smoke-api.mjs",
+    "dev": "tsc -b && pnpm --parallel --filter @study-os/web --filter @study-os/api dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.3",
+    "typescript": "catalog:"
   }
 }

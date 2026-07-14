@@ -5,15 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
-    "lint": "echo api lint placeholder",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "build": "tsc -b",
+    "start": "node dist/server.js",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@study-os/core": "workspace:*"
+    "@study-os/core": "workspace:*",
+    "@study-os/ingestion": "workspace:*",
+    "@study-os/quiz-engine": "workspace:*",
+    "@study-os/scheduler": "workspace:*",
+    "fastify": "^5.10.0"
   },
   "devDependencies": {
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "@types/node": "catalog:",
+    "tsx": "^4.23.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
