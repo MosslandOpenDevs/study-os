@@ -48,17 +48,19 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Apply database migrations
-        run: pnpm db:migrate:deploy
-
-      - name: Seed database
-        run: pnpm db:seed
-
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
+
+      # Migrate + seed after typecheck: tsc -b emits the dist/ artifacts that
+      # the seed script's @study-os/db import resolves to.
+      - name: Apply database migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Seed database
+        run: pnpm db:seed
 
       - name: Test (includes DB integration tests against the migrated DB)
         run: pnpm test
