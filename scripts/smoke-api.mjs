@@ -74,6 +74,10 @@ async function main() {
     fail(`/readyz unexpected: ${ready.status} ${JSON.stringify(readyBody)}`);
     return;
   }
+  if (process.env.DATABASE_URL && readyBody.database !== "ok") {
+    fail(`/readyz did not verify database connectivity: ${JSON.stringify(readyBody)}`);
+    return;
+  }
   console.log("smoke: /readyz OK");
 
   const demo = await fetch(`${BASE}/api/demo/study-loop`);
@@ -90,6 +94,33 @@ async function main() {
     return;
   }
   console.log("smoke: /api/demo/study-loop OK (ingestion + quiz-engine + scheduler resolved)");
+
+  // With a database available (CI: migrated + seeded), exercise the real
+  // upload contract end to end against the booted artifact.
+  if (process.env.DATABASE_URL) {
+    const created = await fetch(`${BASE}/api/sources`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: "seed-user",
+        title: "스모크 업로드",
+        sourceType: "text",
+        rawText: "첫 문단입니다.\n\n둘째 문단입니다.",
+      }),
+    });
+    const createdBody = await created.json();
+    if (created.status !== 201 || createdBody.unitCount !== 2) {
+      fail(`POST /api/sources unexpected: ${created.status} ${JSON.stringify(createdBody)}`);
+      return;
+    }
+    const fetched = await fetch(`${BASE}/api/sources/${createdBody.sourceId}`);
+    const fetchedBody = await fetched.json();
+    if (!fetched.ok || fetchedBody.units?.length !== 2) {
+      fail(`GET /api/sources/:id unexpected: ${fetched.status} ${JSON.stringify(fetchedBody)}`);
+      return;
+    }
+    console.log("smoke: /api/sources upload + fetch round-trip OK (persisted to Postgres)");
+  }
 
   child.kill("SIGTERM");
   const result = await Promise.race([exited, sleep(5000).then(() => null)]);

@@ -36,9 +36,10 @@ archived rather than developed further.
   through `@study-os/db`.
 - Two **stub algorithm packages** (quiz-engine, scheduler) that build and pass
   tests but contain placeholder logic and no LLM calls.
-- A minimal **Fastify API** (`apps/api`) that boots, serves `/healthz`,
-  `/readyz`, and a demo route, and shuts down gracefully — no product
-  endpoints yet.
+- A **Fastify API** (`apps/api`) with health/readiness endpoints (readiness
+  verifies database connectivity), graceful shutdown, and the first product
+  endpoints: text source upload (`POST /api/sources` — validated, ingested,
+  persisted atomically) plus source/unit retrieval with citation offsets.
 - A static Vite + React **intro page** (`apps/web`).
 - **Quality gates:** Biome lint, Vitest unit tests, and a GitHub Actions
   pipeline (frozen install → lint → typecheck → test → build → runtime smoke
@@ -49,8 +50,8 @@ archived rather than developed further.
   adapter, a first migration, and an idempotent seed — applied and
   smoke-tested against real Postgres in CI.
 
-**What is _not_ here yet:** product API endpoints, any real LLM or PDF
-processing, storage, or authentication.
+**What is _not_ here yet:** authentication (userId travels in request bodies —
+must be replaced before any public exposure), PDF processing, object storage.
 
 ---
 
@@ -119,7 +120,7 @@ pending user validation and item-usage rights.
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
 | Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
-| API (`apps/api`) | 🟡 Minimal but runnable | Fastify server with `/healthz`, `/readyz`, graceful shutdown, and a demo route proving runtime package resolution; no product endpoints |
+| API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (`prisma-client` generator, PostgreSQL driver adapter), first migration, idempotent seed, `.env.example`, docker-compose Postgres; CI applies the migration and smoke-tests the built client against a real database |
 | Summary generation (`@study-os/summary`) | ✅ Implemented | Korean-first `SummaryProvider` contract with provenance (`GenerationRun` info: model, prompt version, input hash, tokens); Claude-backed provider (structured outputs, adaptive thinking) when `ANTHROPIC_API_KEY` is set, deterministic offline mock otherwise; **fail-closed** on missing/insufficient evidence, refusals, and malformed output; demo route `POST /api/demo/summary` |
 | PDF / storage | ❌ Missing | No PDF parser or object storage (M3) |

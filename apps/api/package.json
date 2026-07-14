@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@study-os/core": "workspace:*",
+    "@study-os/db": "workspace:*",
     "@study-os/ingestion": "workspace:*",
     "@study-os/quiz-engine": "workspace:*",
     "@study-os/scheduler": "workspace:*",
     "@study-os/summary": "workspace:*",
-    "fastify": "^5.10.0"
+    "fastify": "^5.10.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "catalog:",

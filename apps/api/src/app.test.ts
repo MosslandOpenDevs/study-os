@@ -90,3 +90,26 @@ describe("POST /api/demo/summary", () => {
     expect(res.json().error).toMatch(/too short/);
   });
 });
+
+describe("source routes without a database", () => {
+  it("returns 503 for POST /api/sources when no database is configured", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      payload: { userId: "u", title: "t", sourceType: "text", rawText: "본문입니다." },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toMatch(/database is not configured/);
+  });
+
+  it("returns 503 for GET /api/sources when no database is configured", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/sources?userId=u" });
+    expect(res.statusCode).toBe(503);
+  });
+
+  it("stays ready on /readyz (database-less mode)", async () => {
+    const res = await app.inject({ method: "GET", url: "/readyz" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: "ready" });
+  });
+});
