@@ -1,5 +1,5 @@
 export const productVision =
-  "A Korean-first AI study operating system for notes, quizzes, review, and exam planning.";
+  "Korean-first study tooling, being narrowed toward a source-grounded error-remediation engine for a single exam track. Experimental pre-alpha scaffold — not a released product.";
 
 export type StudyMaterialType = "pdf" | "markdown" | "text";
 export type GoalType = "exam" | "course" | "custom";
