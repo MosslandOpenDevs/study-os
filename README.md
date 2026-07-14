@@ -121,7 +121,8 @@ pending user validation and item-usage rights.
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
 | API (`apps/api`) | 🟡 Minimal but runnable | Fastify server with `/healthz`, `/readyz`, graceful shutdown, and a demo route proving runtime package resolution; no product endpoints |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (`prisma-client` generator, PostgreSQL driver adapter), first migration, idempotent seed, `.env.example`, docker-compose Postgres; CI applies the migration and smoke-tests the built client against a real database |
-| LLM / PDF / storage | ❌ Missing | No model calls, PDF parser, or object storage |
+| Summary generation (`@study-os/summary`) | ✅ Implemented | Korean-first `SummaryProvider` contract with provenance (`GenerationRun` info: model, prompt version, input hash, tokens); Claude-backed provider (structured outputs, adaptive thinking) when `ANTHROPIC_API_KEY` is set, deterministic offline mock otherwise; **fail-closed** on missing/insufficient evidence, refusals, and malformed output; demo route `POST /api/demo/summary` |
+| PDF / storage | ❌ Missing | No PDF parser or object storage (M3) |
 | Tests / lint / CI | ✅ Implemented | Biome lint, Vitest unit tests, GitHub Actions with a frozen-lockfile install and a runtime smoke test of the built API |
 
 > Note on the build: the original scaffold compiled while the built API crashed
@@ -142,9 +143,10 @@ apps/
 packages/
   core/           # shared TypeScript domain types
   db/             # Prisma 7 client factory (PostgreSQL driver adapter)
-  ingestion/      # text-split stub
+  ingestion/      # Korean-aware segmentation with resolvable citation offsets
   quiz-engine/    # placeholder quiz generation + exact-match grading
   scheduler/      # fixed-interval review stub
+  summary/        # Korean summary provider: Claude-backed or deterministic mock
 prisma/
   schema.prisma   # data model
   migrations/     # SQL migrations (applied in CI against real Postgres)

@@ -2,14 +2,24 @@ import type { ErrorNotebookEntry, StudyUnit } from "@study-os/core";
 import { buildIngestionResult } from "@study-os/ingestion";
 import { generateQuizDraft } from "@study-os/quiz-engine";
 import { buildReviewTask } from "@study-os/scheduler";
+import {
+  createDefaultSummaryProvider,
+  SummaryGenerationError,
+  type SummaryProvider,
+  SummaryValidationError,
+  type TonePreset,
+} from "@study-os/summary";
 import Fastify, { type FastifyInstance } from "fastify";
 
 export interface BuildAppOptions {
   logger?: boolean;
+  /** Injectable for tests; defaults to Anthropic when ANTHROPIC_API_KEY is set, else mock. */
+  summaryProvider?: SummaryProvider;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
+  const summaryProvider = options.summaryProvider ?? createDefaultSummaryProvider();
 
   app.get("/", async () => ({
     name: "study-os-api",
@@ -61,6 +71,38 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const reviewTask = buildReviewTask(notebookEntry);
 
     return { ingestion, quizDraft, reviewTask };
+  });
+
+  // Korean summary generation for a study unit (issues #10/#4). Uses the
+  // configured SummaryProvider — deterministic mock without ANTHROPIC_API_KEY,
+  // Claude-backed with it. Fail-closed: invalid input → 400, generation
+  // failure or insufficient evidence → 502; never a fabricated summary.
+  app.post<{
+    Body: { title?: string; content?: string; tonePreset?: TonePreset };
+  }>("/api/demo/summary", async (request, reply) => {
+    const { title, content, tonePreset } = request.body ?? {};
+    if (typeof title !== "string" || typeof content !== "string") {
+      return reply.status(400).send({ error: "title and content are required strings" });
+    }
+    if (tonePreset !== undefined && !["teacher", "tutor", "concise-exam"].includes(tonePreset)) {
+      return reply.status(400).send({ error: "tonePreset must be teacher|tutor|concise-exam" });
+    }
+
+    try {
+      const card = await summaryProvider.generateSummary({
+        unit: { title, content },
+        tonePreset,
+      });
+      return { provider: summaryProvider.name, card };
+    } catch (err) {
+      if (err instanceof SummaryValidationError) {
+        return reply.status(400).send({ error: err.message });
+      }
+      if (err instanceof SummaryGenerationError) {
+        return reply.status(502).send({ error: err.message });
+      }
+      throw err;
+    }
   });
 
   return app;
