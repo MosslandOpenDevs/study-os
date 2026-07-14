@@ -34,8 +34,13 @@ archived rather than developed further.
   Korean-aware segmentation into study units whose citation offsets always
   resolve back to the exact source text, persisted atomically with real ids
   through `@study-os/db`.
-- Two **stub algorithm packages** (quiz-engine, scheduler) that build and pass
-  tests but contain placeholder logic and no LLM calls.
+- An **FSRS review scheduler** (`@study-os/scheduler`): ts-fsrs isolated
+  behind an adapter, raw append-only `ReviewEvent`s (rating, latency,
+  algorithm version, opaque state snapshots), and a prioritized daily queue
+  where recurring errors outrank overdue time — served via
+  `GET /api/review/queue` and `POST /api/review/events`.
+- One remaining **stub package** (quiz-engine): placeholder generation and
+  exact-match grading, no LLM calls.
 - A **Fastify API** (`apps/api`) with health/readiness endpoints (readiness
   verifies database connectivity), graceful shutdown, and the first product
   endpoints: text source upload (`POST /api/sources` — validated, ingested,
@@ -119,7 +124,7 @@ pending user validation and item-usage rights.
 | Domain types (`@study-os/core`) | ✅ Implemented | TypeScript interfaces + a product-vision string; no runtime logic |
 | Ingestion (`@study-os/ingestion`) | ✅ Implemented (text) | Deterministic Korean-aware segmentation (Markdown/`제N장`/numbered/가나다 headings + paragraphs) with citation offsets satisfying `rawText.slice(start, end) === content`; validation; persisted transactionally with real ids via `@study-os/db` (integration-tested against Postgres in CI). PDF ingestion is M3. |
 | Quiz generation (`@study-os/quiz-engine`) | 🟡 Stub | English placeholder prompts, no model; `gradeAnswer` is exact lowercased string match (no Korean normalization) |
-| Review scheduler (`@study-os/scheduler`) | 🟡 Stub | Fixed 24h / 72h / 7d / 14d table; caps at 14 days forever after the 4th review; no FSRS |
+| Review scheduler (`@study-os/scheduler`) | ✅ Implemented | FSRS (ts-fsrs 5) behind an adapter — no hand-rolled algorithm; deterministic (fuzz off); JSON-serializable opaque card state; daily queue prioritizes recurring errors (failed transfers) over overdue time; validation + 14 unit tests; wired to `POST /api/review/events` (raw-event append) and `GET /api/review/queue` |
 | Web app (`apps/web`) | 🟡 Placeholder | Vite + React static intro page; not a product UI |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (PostgreSQL driver adapter), migrations + seed, docker-compose; CI applies migrations and smoke-tests against real Postgres |
@@ -148,7 +153,7 @@ packages/
   db/             # Prisma 7 client factory (PostgreSQL driver adapter)
   ingestion/      # Korean-aware segmentation with resolvable citation offsets
   quiz-engine/    # placeholder quiz generation + exact-match grading
-  scheduler/      # fixed-interval review stub
+  scheduler/      # FSRS adapter (ts-fsrs) + prioritized daily review queue
   summary/        # Korean summary provider: Claude-backed or deterministic mock
 prisma/
   schema.prisma   # data model

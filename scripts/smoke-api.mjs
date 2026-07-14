@@ -88,7 +88,8 @@ async function main() {
     demoBody.ingestion.units.length === 0 ||
     !Array.isArray(demoBody.quizDraft) ||
     demoBody.quizDraft.length === 0 ||
-    typeof demoBody.reviewTask?.scheduledAt !== "string"
+    typeof demoBody.review?.nextDue !== "string" ||
+    typeof demoBody.review?.algorithm !== "string"
   ) {
     fail(`/api/demo/study-loop unexpected: ${demo.status} ${JSON.stringify(demoBody)}`);
     return;
