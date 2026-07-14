@@ -19,7 +19,7 @@ what runs today (see [Implementation status](#implementation-status)).
 > [docs/data-licensing.md](docs/data-licensing.md)).
 
 The original scaffold was authored on a single day (2026-04-10); the current
-implementation landed on 2026-07-14 across PRs #18–#26. The repository is kept
+implementation landed on 2026-07-14 across PRs #18–#28. The repository is kept
 under a **conditional-maintenance gate** with 30- and 60-day checkpoints
 measured from 2026-07-14 (see [Maintenance gate](#maintenance-gate)); if the
 gate is not met it will be archived rather than developed further.
@@ -89,7 +89,9 @@ remediation with recurrence measurement**, on a single exam vertical.
 Instead of merely *saving* a wrong answer (the old `ErrorNotebookEntry`, now
 removed), each error is attributed to a cause, prescribed an intervention, and
 tracked for recurrence. The full loop is **modeled in the database** (see
-`prisma/schema.prisma`); the application wiring lands with M2:
+`prisma/schema.prisma`), and the first half of the loop is live over HTTP —
+wrong answers automatically open an `ErrorEpisode` that lands in the FSRS
+review queue. The suggest/confirm cause step and interventions are next:
 
 ```text
 SourceSpan
@@ -136,7 +138,7 @@ pending user validation and item-usage rights.
 | Web app (`apps/web`) | 🟡 First screens | Study-unit list (`GET /api/sources` via dev proxy, loading/error/empty states, citation badges) + summary card rendering mock data with an AI-generated provenance label; Testing Library tests. Not yet a full study flow. |
 | API (`apps/api`) | 🟡 First product endpoints | Fastify: `POST /api/sources` (zod-validated upload → ingestion → atomic persistence), source/unit retrieval with citations, `POST /api/demo/summary`; `/readyz` verifies DB connectivity; **no auth yet** (userId in body — pre-public blocker) |
 | Database (`prisma/`, `packages/db`) | ✅ Wired | Prisma 7 (PostgreSQL driver adapter), migrations + seed, docker-compose; CI applies migrations and smoke-tests against real Postgres |
-| Remediation data model (issue #2) | ✅ Implemented | `SourceRevision`/`SourceSpan` evidence backbone, `GenerationRun` provenance, `QuizItem` with choices/rubric/citations, `Attempt` (latency/confidence), `ErrorEpisode` (suggested vs confirmed cause), `Intervention`, `TransferAttempt`, append-only `ReviewEvent`; integration-tested end to end in CI. Application wiring is M2. |
+| Remediation data model (issue #2) | ✅ Implemented | `SourceRevision`/`SourceSpan` evidence backbone, `GenerationRun` provenance, `QuizItem` with choices/rubric/citations, `Attempt` (latency/confidence), `ErrorEpisode` (suggested vs confirmed cause), `Intervention`, `TransferAttempt`, append-only `ReviewEvent`; integration-tested end to end in CI. Wired live: attempt → episode → review queue; cause suggest/confirm + interventions are the next slice. |
 | Summary generation (`@study-os/summary`) | ✅ Implemented | Korean-first `SummaryProvider` contract with provenance (`GenerationRun` info: model, prompt version, input hash, tokens); Claude-backed provider (structured outputs, adaptive thinking) when `ANTHROPIC_API_KEY` is set, deterministic offline mock otherwise; **fail-closed** on missing/insufficient evidence, refusals, and malformed output; demo route `POST /api/demo/summary` |
 | PDF / storage | ❌ Missing | No PDF parser or object storage (M3) |
 | Tests / lint / CI | ✅ Implemented | Biome lint, Vitest unit tests, GitHub Actions with a frozen-lockfile install and a runtime smoke test of the built API |
@@ -308,6 +310,7 @@ pnpm smoke:db                    # built client ↔ migrated DB round-trip check
 
 The API listens on `PORT` (default `3000`, host `127.0.0.1`) and exposes
 `/healthz`, `/readyz`, `POST/GET /api/sources`, `GET /api/sources/:id`,
+`POST /api/units/:id/quiz`, `POST /api/quiz-items/:id/attempts`,
 `POST /api/review/events`, `GET /api/review/queue`, and the demo routes
 (`/api/demo/study-loop`, `POST /api/demo/summary`).
 
