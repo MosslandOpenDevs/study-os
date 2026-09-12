@@ -1,5 +1,10 @@
 # study-os
 
+<!-- opendevs-badges:start -->
+[![CI](https://github.com/MosslandOpenDevs/study-os/actions/workflows/ci.yml/badge.svg)](https://github.com/MosslandOpenDevs/study-os/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-64748b?style=flat)](LICENSE)
+<!-- opendevs-badges:end -->
+
 Korean-first study tooling — currently being narrowed from a broad "AI study OS"
 concept toward a focused target: a **source-grounded error-remediation engine**
 for a single Korean exam track. That target is a direction, not a description of
